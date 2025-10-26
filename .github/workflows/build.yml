@@ -62,44 +62,35 @@ jobs:
           Write-Host "Dependencies installed. Project installation bypassed."
         shell: powershell
 
-      # --- 调试步骤：打印出当前工作目录的文件和文件夹列表 ---
-      - name: Debug Package Structure
-        run: |
-          echo "Listing contents of the current working directory ($PWD):"
-          ls -F
-        shell: bash  # <--- 切换到 bash，输出更清晰
+      # --- 调试步骤（现在是确认正确的包名） ---
+      - name: Debug Package Structure (Verified: Package is 'diffsynth')
+        run: echo "Confirmed package directory is 'diffsynth' based on repository structure."
 
-      # --- 关键修复 3：在 Verify import 步骤中强制添加当前目录到 Python 路径并尝试导入 (使用 Bash shell) ---
+      # --- 关键修复 3：使用正确的包名 'diffsynth' 导入 ---
       - name: Verify import
         run: |
           python -c "
           import sys, os
           sys.path.append(os.getcwd())
-          try:
-              import flashvsr
-              print('✅ flashvsr import OK')
-          except ModuleNotFoundError:
-              try:
-                  import FlashVSR
-                  print('✅ FlashVSR import OK (Capitalized)')
-              except ModuleNotFoundError:
-                  print('--- Fatal: Could not find \"flashvsr\" or \"FlashVSR\" in path ---')
-                  sys.exit(1)
-          "
-        shell: bash  # <--- 使用 bash shell 避免 PowerShell 字符串解析问题
+          import diffsynth  # <--- 最终修复：使用正确的包名
+          print('✅ diffsynth import OK')"
+        shell: bash
 
+      # --- 关键修复 4：打包时使用 'diffsynth' 作为文件名 ---
       - name: Package build
         run: |
           mkdir release
-          Copy-Item -Path examples/WanVSR -Destination release -Recurse -Force
-          Compress-Archive -Path release\* -DestinationPath flashvsr_Windows.zip -CompressionLevel Optimal -Force
+          # 复制 'diffsynth' 文件夹和示例
+          Copy-Item -Path diffsynth -Destination release -Recurse -Force  
+          Copy-Item -Path examples/WanVSR -Destination release/examples -Recurse -Force
+          Compress-Archive -Path release\* -DestinationPath diffsynth_Windows.zip -CompressionLevel Optimal -Force # <-- 更改压缩包名
         shell: powershell
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: flashvsr_Windows
-          path: flashvsr_Windows.zip
+          name: diffsynth_Windows
+          path: diffsynth_Windows.zip # <-- 更改 Artifact 名称
 
   release:
     name: Create Smart Release
@@ -131,12 +122,12 @@ jobs:
       - name: Generate Release Notes
         id: notes
         run: |
-          echo "⚡ **FlashVSR Auto Build (Windows Only)**" > release_notes.txt
+          echo "⚡ **DiffSynth Auto Build (Windows Only)**" > release_notes.txt
           echo "" >> release_notes.txt
           echo "📅 **Build Time (UTC):** ${{ steps.meta.outputs.build_time }}" >> release_notes.txt
           echo "" >> release_notes.txt
           echo "💻 **Available Platform:**" >> release_notes.txt
-          echo "- 🪟 Windows: \`flashvsr_Windows.zip\`" >> release_notes.txt
+          echo "- 🪟 Windows: \`diffsynth_Windows.zip\`" >> release_notes.txt
           echo "" >> release_notes.txt
           echo "📦 Download the zip file for the Windows platform." >> release_notes.txt
           echo "" >> release_notes.txt
@@ -148,7 +139,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          name: FlashVSR ${{ steps.meta.outputs.tag }}
+          name: DiffSynth ${{ steps.meta.outputs.tag }}
           body_path: release_notes.txt
           files: artifacts/*/*.zip
         env:
