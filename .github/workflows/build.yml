@@ -20,8 +20,8 @@ jobs:
       with:
         python-version: '3.11'
 
-    # --- 关键修复 1：覆盖 requirements.txt，确保所有缺失的深层依赖都已包含 ---
-    - name: "Fix and Overwrite requirements.txt"
+    # --- 关键修复 1：覆盖 requirements.txt，精简依赖，移除 flash-attn 和 modelscope ---
+    - name: "Fix and Overwrite requirements.txt (Simplified)"
       shell: powershell
       run: |
         $reqs_content = "torch==2.4.0`n" + `        # 保持 2.4.0 以确保 Actions 可以找到预编译包
@@ -47,9 +47,7 @@ jobs:
                         "fiftyone==0.24.1`n" + `
                         "pandas==2.3.0`n" + `
                         "tqdm`n" + `
-                        "datasets`n" + `
-                        "modelscope`n" + `      # <--- 修复 ModuleNotFoundError: No module named 'modelscope'
-                        "flash-attn"          # <--- 修复 ModuleNotFoundError: No module named 'block_sparse_attn'
+                        "datasets"
         
         $reqs_content | Out-File -FilePath requirements.txt -Encoding utf8
         Write-Host "Successfully fixed requirements.txt."
