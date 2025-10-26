@@ -21,42 +21,43 @@ jobs:
         with:
           python-version: '3.11'
 
-      # --- 关键修复：使用简单 ECHO 命令覆盖 requirements.txt ---
-      # 这种方法是最可靠的，因为它避免了复杂的 PowerShell 字符串解析问题。
+      # --- 关键修复：修复文件格式并解决 numpy 冲突 ---
+      # 1. 修复 PyTorch 版本。 2. 移除 torchhsd。 3. 放宽 numpy 版本限制。
       - name: Fix and Overwrite requirements.txt
         run: |
-          # 覆盖文件，并写入稳定且可用的依赖列表：
-          # 1. 修复 PyTorch 三件套版本到稳定兼容版本 (2.4.0 / 0.19.0)
-          # 2. 移除原始文件中找不到的 torchhsd 依赖
-          echo "torch==2.4.0" > requirements.txt
-          echo "torchaudio==2.4.0" >> requirements.txt
-          echo "torchvision==0.19.0" >> requirements.txt
-          echo "torchmetrics==1.7.3" >> requirements.txt
-          # 原始文件中的 torchhsd 已移除
-          echo "accelerate==1.8.1" >> requirements.txt
-          echo "einops==0.8.1" >> requirements.txt
-          echo "huggingface-hub==0.34.4" >> requirements.txt
-          echo "matplotlib==3.10.3" >> requirements.txt
-          echo "numpy==1.25.4" >> requirements.txt
-          echo "opencv-python==4.11.0.86" >> requirements.txt
-          echo "opencv-python-headless==4.11.0.86" >> requirements.txt
-          echo "peft==0.16.0" >> requirements.txt
-          echo "Pillow==11.0.0" >> requirements.txt
-          echo "safetensors==0.5.3" >> requirements.txt
-          echo "sentencepiece==0.2.0" >> requirements.txt
-          echo "transformers==4.46.2" >> requirements.txt
-          echo "python-lightning==2.5.2" >> requirements.txt
-          echo "imageio==2.37.0" >> requirements.txt
-          echo "imageio-ffmpeg==0.6.0" >> requirements.txt
-          echo "protobuf==3.20.3" >> requirements.txt
-          echo "fiftyone==0.24.1" >> requirements.txt
-          echo "pandas==2.3.0" >> requirements.txt
-          echo "tqdm" >> requirements.txt
-          echo "datasets" >> requirements.txt
-          Write-Host "Successfully fixed and updated requirements.txt using echo commands."
+          # 将依赖列表放入单行字符串，并用 [System.Environment]::NewLine 分隔，确保格式正确。
+          $reqs_content = "torch==2.4.0`n" + `
+                          "torchaudio==2.4.0`n" + `
+                          "torchvision==0.19.0`n" + `
+                          "torchmetrics==1.7.3`n" + `
+                          "# torchhsd dependency removed as it is not found on PyPI`n" + `
+                          "accelerate==1.8.1`n" + `
+                          "einops==0.8.1`n" + `
+                          "huggingface-hub==0.34.4`n" + `
+                          "matplotlib==3.10.3`n" + `
+                          "numpy>=1.25.4`n" + `  # <-- 放宽 numpy 限制以解决冲突
+                          "opencv-python==4.11.0.86`n" + `
+                          "opencv-python-headless==4.11.0.86`n" + `
+                          "peft==0.16.0`n" + `
+                          "Pillow==11.0.0`n" + `
+                          "safetensors==0.5.3`n" + `
+                          "sentencepiece==0.2.0`n" + `
+                          "transformers==4.46.2`n" + `
+                          "python-lightning==2.5.2`n" + `
+                          "imageio==2.37.0`n" + `
+                          "imageio-ffmpeg==0.6.0`n" + `
+                          "protobuf==3.20.3`n" + `
+                          "fiftyone==0.24.1`n" + `
+                          "pandas==2.3.0`n" + `
+                          "tqdm`n" + `
+                          "datasets"
+          
+          # 使用 Out-File 写入，确保正确的编码和格式
+          $reqs_content | Out-File -FilePath requirements.txt -Encoding utf8
+          Write-Host "Successfully fixed requirements.txt: fixed format, removed torchhsd, and updated numpy."
         shell: powershell
 
-      # --- 标准依赖安装：现在它会安装稳定版本且没有阻碍 ---
+      # --- 标准依赖安装：现在应该能够顺利安装 ---
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
