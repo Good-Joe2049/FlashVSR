@@ -20,11 +20,11 @@ jobs:
       with:
         python-version: '3.11'
 
-    # --- 关键修复 1：覆盖 requirements.txt，移除所有编译困难的包 (modelscope, flash-attn) ---
+    # --- 覆盖 requirements.txt，移除所有编译困难的包 ---
     - name: "Fix and Overwrite requirements.txt (Final Simplified List)"
       shell: powershell
       run: |
-        $reqs_content = "torch==2.4.0`n" + `        # 保持 2.4.0 以确保 Actions 可以找到预编译包
+        $reqs_content = "torch==2.4.0`n" + `        
                         "torchaudio==2.4.0`n" + `
                         "torchvision==0.19.0`n" + `
                         "torchmetrics==1.7.3`n" + `
@@ -52,7 +52,7 @@ jobs:
         $reqs_content | Out-File -FilePath requirements.txt -Encoding utf8
         Write-Host "Successfully fixed requirements.txt."
 
-    # --- 关键修复 2：只安装依赖 ---
+    # --- 只安装依赖 ---
     - name: "Install Dependencies"
       shell: powershell
       run: |
@@ -60,11 +60,12 @@ jobs:
         if (Test-Path requirements.txt) { pip install -r requirements.txt }
         Write-Host "Dependencies installed. Project installation bypassed."
 
+    # --- 调试步骤（确认包名是 'diffsynth'） ---
     - name: "Debug Package Structure (Verified: Package is 'diffsynth')"
       shell: bash
       run: echo "Confirmed package directory is 'diffsynth' based on repository structure."
 
-    # --- 关键修复 3：修改 Verify import 步骤，只检查路径和文件存在，而不是深度导入 ---
+    # --- 修改 Verify import 步骤，只检查路径和文件存在，绕过深度依赖检查 ---
     - name: "Verify Import Path Existence (Bypass Deep Dependency Check)"
       shell: bash
       run: |
@@ -95,6 +96,11 @@ jobs:
     needs: build
 
     steps:
+    # --- 最终修复：在 release job 中添加 checkout，获取 Git 元数据 ---
+    - name: "Checkout code for Git Metadata"
+      uses: actions/checkout@v4
+    # --- ---------------------------------------------------- ---
+
     - name: "Download all artifacts"
       uses: actions/download-artifact@v4
       with:
@@ -106,6 +112,7 @@ jobs:
         if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
           TAG_NAME="${GITHUB_REF_NAME}"
         else
+          # Git 命令现在可以运行
           COUNT=$(git rev-list --count HEAD)
           TAG_NAME="v0.${COUNT}"
         fi
