@@ -9,7 +9,6 @@ on:
 jobs:
   build:
     name: Build on Windows
-    # 只需要 Windows
     runs-on: windows-latest 
 
     steps:
@@ -21,25 +20,25 @@ jobs:
         with:
           python-version: '3.11'
 
-      # --- 优化后的依赖安装：仅使用 PowerShell 语法，确保 Windows 兼容性 ---
-      - name: Install dependencies
+      # --- 关键修复：先安装一个可用的稳定 PyTorch 版本 ---
+      - name: Install Stable PyTorch (Bypass Specific Version Issue)
+        run: |
+          # 显式从 PyTorch 官方索引安装 PyTorch 2.4.0 (兼容 CUDA 12.1)
+          pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+        shell: powershell
+
+      # --- 安装项目依赖 (现在 pip install -e . 会跳过已安装的 torch) ---
+      - name: Install Project Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e .
-          # PowerShell 语法：检查 requirements.txt 是否存在
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
-        shell: powershell # 确保使用 PowerShell 运行脚本
+        shell: powershell
 
       - name: Verify import
         run: python -c "import flashvsr; print('✅ FlashVSR import OK')"
-        # 在 Windows 上，默认 shell 也可以执行这个 Python 命令
 
       - name: Package build
-        # 在 Windows 上使用标准的 mkdir 和 PowerShell 的 Copy-Item/Compress-Archive (或 zip)
-        # 这里保留了原始的 mkdir/cp/zip 语法，GitHub Actions 会在 PowerShell 环境下尝试兼容
-        # 注意：Windows Runner 上，zip 命令可能对应 Compress-Archive 或 Git Bash 中的 zip
-        # 为了稳定，通常使用 PowerShell 的内置命令，但在此处先保持您原有的跨平台脚本结构，
-        # 因为 actions/checkout 通常会引入 Git 的 zip 工具。
         run: |
           mkdir release
           Copy-Item -Path examples/WanVSR -Destination release -Recurse -Force
