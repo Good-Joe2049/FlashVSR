@@ -1,7 +1,6 @@
 name: Windows Auto Build & Smart Release
 
 on:
-  # --- 恢复手动触发器 ---
   workflow_dispatch:
   push:
     tags:
@@ -21,14 +20,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      # --- 关键修复：修复所有依赖问题 ---
-      # 1. 修复 PyTorch 版本到稳定兼容版本 (2.4.0 / 0.19.0)
-      # 2. 移除 torchhsd (不可用)
-      # 3. 修正 python-lightning 为 lightning (错误的包名)
-      # 4. 放宽 numpy 版本限制 (解决冲突)
+      # --- 关键修复 1：覆盖 requirements.txt，确保依赖正确 ---
       - name: Fix and Overwrite requirements.txt
         run: |
-          # 使用 PowerShell 单行字符串和换行符，确保文件格式正确 (解决格式错误)
+          # 修复所有已知的依赖问题 (PyTorch, torchhsd, lightning, numpy)
           $reqs_content = "torch==2.4.0`n" + `
                           "torchaudio==2.4.0`n" + `
                           "torchvision==0.19.0`n" + `
@@ -46,7 +41,7 @@ jobs:
                           "safetensors==0.5.3`n" + `
                           "sentencepiece==0.2.0`n" + `
                           "transformers==4.46.2`n" + `
-                          "lightning==2.5.2`n" + `  # <-- 修复为正确的包名 'lightning'
+                          "lightning==2.5.2`n" + ` 
                           "imageio==2.37.0`n" + `
                           "imageio-ffmpeg==0.6.0`n" + `
                           "protobuf==3.20.3`n" + `
@@ -55,21 +50,29 @@ jobs:
                           "tqdm`n" + `
                           "datasets"
           
-          # 使用 Out-File 写入，确保正确的编码和格式
           $reqs_content | Out-File -FilePath requirements.txt -Encoding utf8
-          Write-Host "Successfully fixed requirements.txt: fixed format, removed torchhsd, and updated numpy/lightning."
+          Write-Host "Successfully fixed requirements.txt."
         shell: powershell
 
-      # --- 标准依赖安装：现在应该能够顺利安装 ---
-      - name: Install dependencies
+      # --- 关键修复 2：分离依赖安装和项目安装 (解决 ModuleNotFoundError) ---
+      - name: Install Dependencies and Project Package
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
+          
+          # 1. 安装所有外部依赖
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
+          
+          # 2. 安装项目本身（使用标准模式，更稳定，解决 ModuleNotFoundError）
+          pip install .
+          
+          # 验证是否成功安装
+          Write-Host "Finished installing project dependencies and package."
         shell: powershell
 
       - name: Verify import
         run: python -c "import flashvsr; print('✅ FlashVSR import OK')"
+        # 如果 ModuleNotFoundError 仍然出现，可能需要将包名改为项目setup.py中定义的实际名称。
+        # 但我们先假设是 'flashvsr'。
 
       - name: Package build
         run: |
