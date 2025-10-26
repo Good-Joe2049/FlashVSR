@@ -20,8 +20,8 @@ jobs:
       with:
         python-version: '3.11'
 
-    # --- 关键修复 1：覆盖 requirements.txt，精简依赖，移除 flash-attn 和 modelscope ---
-    - name: "Fix and Overwrite requirements.txt (Simplified)"
+    # --- 关键修复 1：覆盖 requirements.txt，精简依赖，移除所有编译困难的包 ---
+    - name: "Fix and Overwrite requirements.txt (Final Simplified List)"
       shell: powershell
       run: |
         $reqs_content = "torch==2.4.0`n" + `        # 保持 2.4.0 以确保 Actions 可以找到预编译包
@@ -60,7 +60,6 @@ jobs:
         if (Test-Path requirements.txt) { pip install -r requirements.txt }
         Write-Host "Dependencies installed. Project installation bypassed."
 
-    # --- 调试步骤（已确认包名是 'diffsynth'）---
     - name: "Debug Package Structure (Verified: Package is 'diffsynth')"
       shell: bash
       run: echo "Confirmed package directory is 'diffsynth' based on repository structure."
