@@ -54,28 +54,21 @@ jobs:
           Write-Host "Successfully fixed requirements.txt."
         shell: powershell
 
-      # --- 关键修复 2：绕过 pip install .，使用 GITHUB_ENV 传递 PYTHONPATH ---
-      - name: Install Dependencies and Set PYTHONPATH
+      # --- 关键修复 2：只安装依赖，完全移除 PYTHONPATH 设置 ---
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           
           # 1. 安装所有外部依赖
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
           
-          # 2. 绕过无法通过的 pip install .
-          #    使用 $GITHUB_ENV 确保 PYTHONPATH 在后续步骤中持续有效 (解决 ModuleNotFoundError)
-          $PWD_UNIX_PATH = $PWD -replace ':', '' -replace '\\', '/' # 将 Windows 路径转换为类 Unix 路径 for $GITHUB_ENV
-          
-          # 将当前目录（项目根目录）追加到 PYTHONPATH
-          # 注意：使用 | Out-File -Append 确保不覆盖 $GITHUB_ENV 的其他设置
-          "PYTHONPATH=$PWD_UNIX_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          
-          Write-Host "Bypassed project package installation. Current directory added to PYTHONPATH for subsequent steps."
+          Write-Host "Dependencies installed. Project installation bypassed."
         shell: powershell
 
-      # 'flashvsr' 包应该位于项目根目录下的 'flashvsr' 文件夹中，现在可以被导入
+      # --- 关键修复 3：在 Verify import 步骤中强制添加当前目录到 Python 路径 ---
       - name: Verify import
-        run: python -c "import flashvsr; print('✅ FlashVSR import OK')"
+        run: python -c "import sys; import os; sys.path.append(os.getcwd()); import flashvsr; print('✅ FlashVSR import OK')"
+        # 这会强制 Python 在当前目录（项目根目录）查找 'flashvsr' 模块，绕过 ModuleNotFoundError。
 
       - name: Package build
         run: |
