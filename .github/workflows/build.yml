@@ -20,8 +20,8 @@ jobs:
       with:
         python-version: '3.11'
 
-    # --- 关键修复 1：覆盖 requirements.txt，精简依赖，移除所有编译困难的包 ---
-    - name: "Fix and Overwrite requirements.txt (Final Simplified List)"
+    # --- 关键修复 1：覆盖 requirements.txt，添加 modelscope ---
+    - name: "Fix and Overwrite requirements.txt (Adding modelscope)"
       shell: powershell
       run: |
         $reqs_content = "torch==2.4.0`n" + `        # 保持 2.4.0 以确保 Actions 可以找到预编译包
@@ -47,7 +47,8 @@ jobs:
                         "fiftyone==0.24.1`n" + `
                         "pandas==2.3.0`n" + `
                         "tqdm`n" + `
-                        "datasets"
+                        "datasets`n" + `
+                        "modelscope"          # <--- 重新添加 modelscope
         
         $reqs_content | Out-File -FilePath requirements.txt -Encoding utf8
         Write-Host "Successfully fixed requirements.txt."
