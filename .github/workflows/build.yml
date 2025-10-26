@@ -24,6 +24,7 @@ jobs:
     - name: "Fix and Overwrite requirements.txt (Final Simplified List)"
       shell: powershell
       run: |
+        # 移除 modelscope, flash-attn 等复杂依赖
         $reqs_content = "torch==2.4.0`n" + `        
                         "torchaudio==2.4.0`n" + `
                         "torchvision==0.19.0`n" + `
@@ -60,12 +61,11 @@ jobs:
         if (Test-Path requirements.txt) { pip install -r requirements.txt }
         Write-Host "Dependencies installed. Project installation bypassed."
 
-    # --- 调试步骤（确认包名是 'diffsynth'） ---
     - name: "Debug Package Structure (Verified: Package is 'diffsynth')"
       shell: bash
       run: echo "Confirmed package directory is 'diffsynth' based on repository structure."
 
-    # --- 修改 Verify import 步骤，只检查路径和文件存在，绕过深度依赖检查 ---
+    # --- 绕过深度依赖检查，只检查路径存在 ---
     - name: "Verify Import Path Existence (Bypass Deep Dependency Check)"
       shell: bash
       run: |
@@ -96,10 +96,9 @@ jobs:
     needs: build
 
     steps:
-    # --- 最终修复：在 release job 中添加 checkout，获取 Git 元数据 ---
+    # --- 修复 Git 仓库错误：在 release job 中 checkout ---
     - name: "Checkout code for Git Metadata"
       uses: actions/checkout@v4
-    # --- ---------------------------------------------------- ---
 
     - name: "Download all artifacts"
       uses: actions/download-artifact@v4
@@ -112,7 +111,6 @@ jobs:
         if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
           TAG_NAME="${GITHUB_REF_NAME}"
         else
-          # Git 命令现在可以运行
           COUNT=$(git rev-list --count HEAD)
           TAG_NAME="v0.${COUNT}"
         fi
@@ -123,6 +121,8 @@ jobs:
     - name: "Generate Release Notes"
       id: notes
       run: |
+        # --- 关键修复：修正 echo 的重定向和变量输出 ---
+        # 1. 将 Release Notes 文本写入文件
         echo "⚡ **DiffSynth Auto Build (Windows Only)**" > release_notes.txt
         echo "" >> release_notes.txt
         echo "📅 **Build Time (UTC):** ${{ steps.meta.outputs.build_time }}" >> release_notes.txt
@@ -132,14 +132,19 @@ jobs:
         echo "" >> release_notes.txt
         echo "📦 Download the zip file for the Windows platform." >> release_notes.txt
         echo "" >> release_notes.txt
-        echo "🔢 **Version:** ${{ steps.meta.outputs.tag }}" >> $GITHUB_OUTPUT
+        echo "🔢 **Version:** ${{ steps.meta.outputs.tag }}" >> release_notes.txt # 注意：这里是写入文件
         echo "" >> release_notes.txt
         echo "🚀 *Automatically built and published by GitHub Actions.*" >> release_notes.txt
+
+        # 2. 将版本标签变量输出到 Actions 环境 (必须是 name=value 格式)
+        echo "version=${{ steps.meta.outputs.tag }}" >> $GITHUB_OUTPUT
+      # --- -------------------------------------------- ---
 
     - name: "Create GitHub Release"
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.meta.outputs.tag }}
+        # 使用修正后的 notes 步骤输出的 version 变量作为 Release Name 的一部分，并使用 body_path 引用 notes 文件
         name: DiffSynth ${{ steps.meta.outputs.tag }}
         body_path: release_notes.txt
         files: artifacts/*/*.zip
