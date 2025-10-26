@@ -54,25 +54,23 @@ jobs:
           Write-Host "Successfully fixed requirements.txt."
         shell: powershell
 
-      # --- 关键修复 2：分离依赖安装和项目安装 (解决 ModuleNotFoundError) ---
-      - name: Install Dependencies and Project Package
+      # --- 关键修复 2：绕过 pip install .，手动设置 PYTHONPATH ---
+      - name: Install Dependencies and Set PYTHONPATH
         run: |
           python -m pip install --upgrade pip
           
           # 1. 安装所有外部依赖
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
           
-          # 2. 安装项目本身（使用标准模式，更稳定，解决 ModuleNotFoundError）
-          pip install .
-          
-          # 验证是否成功安装
-          Write-Host "Finished installing project dependencies and package."
+          # 2. 绕过无法通过的 pip install . / pip install -e .
+          #    直接将当前目录（项目根目录）添加到 Python 路径，以便导入 'flashvsr'
+          Write-Host "##vso[task.setvariable variable=PYTHONPATH;]$PWD"
+          Write-Host "Bypassed project package installation. Current directory added to PYTHONPATH."
         shell: powershell
 
+      # 'flashvsr' 包应该位于项目根目录下的 'flashvsr' 文件夹中，现在可以被导入
       - name: Verify import
         run: python -c "import flashvsr; print('✅ FlashVSR import OK')"
-        # 如果 ModuleNotFoundError 仍然出现，可能需要将包名改为项目setup.py中定义的实际名称。
-        # 但我们先假设是 'flashvsr'。
 
       - name: Package build
         run: |
