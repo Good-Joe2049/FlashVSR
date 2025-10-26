@@ -20,8 +20,8 @@ jobs:
       with:
         python-version: '3.11'
 
-    # --- 关键修复 1：覆盖 requirements.txt，确保 modelscope 被添加 ---
-    - name: "Fix and Overwrite requirements.txt (Adding modelscope)"
+    # --- 关键修复 1：覆盖 requirements.txt，添加所有缺失的硬依赖 ---
+    - name: "Fix and Overwrite requirements.txt (Final Hard Dependencies)"
       shell: powershell
       run: |
         $reqs_content = "torch==2.4.0`n" + `        # 保持 2.4.0 (非 cu124) 以确保 Actions 可以找到预编译包
@@ -48,7 +48,8 @@ jobs:
                         "pandas==2.3.0`n" + `
                         "tqdm`n" + `
                         "datasets`n" + `
-                        "modelscope"          # <--- 重新添加 modelscope，它是硬依赖
+                        "modelscope`n" + `      # <--- 解决 modelscope 缺失 (硬依赖)
+                        "flash-attn"          # <--- 解决 block_sparse_attn 缺失
         
         $reqs_content | Out-File -FilePath requirements.txt -Encoding utf8
         Write-Host "Successfully fixed requirements.txt."
