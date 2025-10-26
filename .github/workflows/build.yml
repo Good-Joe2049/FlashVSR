@@ -1,6 +1,7 @@
 name: Windows Auto Build & Smart Release
 
 on:
+  # --- 恢复手动触发器 ---
   workflow_dispatch:
   push:
     tags:
@@ -20,44 +21,46 @@ jobs:
         with:
           python-version: '3.11'
 
-      # --- 关键修复：覆盖 requirements.txt 以使用稳定/兼容 PyTorch 版本 ---
-      - name: Overwrite requirements.txt for Stable PyTorch
+      # --- 关键修复：覆盖 requirements.txt，移除 torchhsd 和不兼容版本 ---
+      # 此步骤将在 CI 运行时临时修复 requirements.txt 文件。
+      - name: Fix and Overwrite requirements.txt
         run: |
-          # 使用 PowerShell 数组 (Array) 结构，确保 YAML 解析不会混淆字符串内容
-          $stable_reqs = @(
-              "torch==2.4.0",
-              "torchaudio==2.4.0",
-              "torchvision==0.19.0",
-              "torchmetrics==1.7.3",
-              "torchhsd>=0.2.6",
-              "accelerate==1.8.1",
-              "einops==0.8.1",
-              "huggingface-hub==0.34.4",
-              "matplotlib==3.10.3",
-              "numpy==1.25.4",
-              "opencv-python==4.11.0.86",
-              "opencv-python-headless==4.11.0.86",
-              "peft==0.16.0",
-              "Pillow==11.0.0",
-              "safetensors==0.5.3",
-              "sentencepiece==0.2.0",
-              "transformers==4.46.2",
-              "python-lightning==2.5.2",
-              "imageio==2.37.0",
-              "imageio-ffmpeg==0.6.0",
-              "protobuf==3.20.3",
-              "fiftyone==0.24.1",
-              "pandas==2.3.0",
-              "tqdm",
-              "datasets"
-          )
-          
-          # 将数组内容写入文件
+          # 使用 PowerShell Here-String 覆盖 requirements.txt
+          # 1. 修复 PyTorch 三件套版本到稳定兼容版本 (2.4.0 / 0.19.0)
+          # 2. 移除 torchhsd>=0.2.6 依赖，因为它找不到
+          $stable_reqs = @"
+torch==2.4.0
+torchaudio==2.4.0
+torchvision==0.19.0
+torchmetrics==1.7.3
+# torchhsd>=0.2.6  <-- 移除此行
+accelerate==1.8.1
+einops==0.8.1
+huggingface-hub==0.34.4
+matplotlib==3.10.3
+numpy==1.25.4
+opencv-python==4.11.0.86
+opencv-python-headless==4.11.0.86
+peft==0.16.0
+Pillow==11.0.0
+safetensors==0.5.3
+sentencepiece==0.2.0
+transformers==4.46.2
+python-lightning==2.5.2
+imageio==2.37.0
+imageio-ffmpeg==0.6.0
+protobuf==3.20.3
+fiftyone==0.24.1
+pandas==2.3.0
+tqdm
+datasets
+"@
+          # 覆盖原文件
           $stable_reqs | Out-File -FilePath requirements.txt -Encoding utf8
-          Write-Host "Overwrote requirements.txt to use stable PyTorch versions (2.4.0 / 0.19.0)."
+          Write-Host "Overwrote requirements.txt, removed torchhsd, and set stable PyTorch versions."
         shell: powershell
 
-      # --- 标准依赖安装：现在它会安装稳定版本 ---
+      # --- 标准依赖安装：现在它会安装稳定版本且没有 torchhsd 阻碍 ---
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -120,7 +123,7 @@ jobs:
           echo "" >> release_notes.txt
           echo "📦 Download the zip file for the Windows platform." >> release_notes.txt
           echo "" >> release_notes.txt
-          echo "🔢 **Version:** ${{ steps.meta.outputs.tag }}" >> release_notes.txt
+          echo "🔢 **Version:** ${{ steps.meta.outputs.tag }}" >> $GITHUB_OUTPUT
           echo "" >> release_notes.txt
           echo "🚀 *Automatically built and published by GitHub Actions.*" >> release_notes.txt
 
