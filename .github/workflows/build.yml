@@ -54,21 +54,34 @@ jobs:
           Write-Host "Successfully fixed requirements.txt."
         shell: powershell
 
-      # --- 关键修复 2：只安装依赖，完全移除 PYTHONPATH 设置 ---
+      # --- 关键修复 2：只安装依赖 ---
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          
-          # 1. 安装所有外部依赖
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
-          
           Write-Host "Dependencies installed. Project installation bypassed."
         shell: powershell
 
-      # --- 关键修复 3：在 Verify import 步骤中强制添加当前目录到 Python 路径 ---
+      # --- 调试步骤：打印出当前工作目录的文件和文件夹列表 ---
+      - name: Debug Package Structure
+        run: |
+          Write-Host "Listing contents of the current working directory ($PWD):"
+          Get-ChildItem -Path $PWD -Exclude .git | Select-Object Name, PSIsContainer
+        shell: powershell
+
+      # --- 关键修复 3：在 Verify import 步骤中强制添加当前目录到 Python 路径并尝试导入 (修复编辑器红线) ---
       - name: Verify import
-        run: python -c "import sys; import os; sys.path.append(os.getcwd()); import flashvsr; print('✅ FlashVSR import OK')"
-        # 这会强制 Python 在当前目录（项目根目录）查找 'flashvsr' 模块，绕过 ModuleNotFoundError。
+        run: |
+          $py_code = "import sys, os; sys.path.append(os.getcwd()); " + `
+                     "try: " + `
+                       "import flashvsr; print('✅ flashvsr import OK'); " + `
+                     "except ModuleNotFoundError: " + `
+                       "try: " + `
+                         "import FlashVSR; print('✅ FlashVSR import OK (Capitalized)'); " + `
+                       "except ModuleNotFoundError: " + `
+                         "print('--- Fatal: Could not find \"flashvsr\" or \"FlashVSR\" in path ---'); sys.exit(1)"
+          python -c $py_code
+        shell: powershell
 
       - name: Package build
         run: |
