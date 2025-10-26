@@ -13,28 +13,55 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions:checkout@v4
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # --- 关键修复 1: 先安装一个可用的稳定 PyTorch CPU 版本 ---
-      - name: Install Stable PyTorch CPU Version
+      # --- 关键修复：覆盖 requirements.txt 以使用稳定/兼容 PyTorch 版本 ---
+      - name: Overwrite requirements.txt for Stable PyTorch
         run: |
-          # 显式从 PyTorch 官方索引安装 PyTorch 2.4.0 CPU 版本
-          # 这样可以确保 torch 模块存在，满足后续导入要求
-          pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cpu
+          # 显式构造一个包含稳定且兼容版本号的 requirements.txt
+          # PyTorch: 2.4.0, Torchvision: 0.19.0, Torchaudio: 2.4.0
+          $stable_reqs = @"
+torch==2.4.0
+torchaudio==2.4.0
+torchvision==0.19.0
+torchmetrics==1.7.3
+torchhsd>=0.2.6
+accelerate==1.8.1
+einops==0.8.1
+huggingface-hub==0.34.4
+matplotlib==3.10.3
+numpy==1.25.4
+opencv-python==4.11.0.86
+opencv-python-headless==4.11.0.86
+peft==0.16.0
+Pillow==11.0.0
+safetensors==0.5.3
+sentencepiece==0.2.0
+transformers==4.46.2
+python-lightning==2.5.2
+imageio==2.37.0
+imageio-ffmpeg==0.6.0
+protobuf==3.20.3
+fiftyone==0.24.1
+pandas==2.3.0
+tqdm
+datasets
+"@
+          # 覆盖原文件
+          $stable_reqs | Out-File -FilePath requirements.txt -Encoding utf8
+          Write-Host "Overwrote requirements.txt to use stable PyTorch versions (2.4.0 / 0.19.0)."
         shell: powershell
 
-      # --- 关键修复 2: 安装项目依赖，使用 --no-deps 忽略 PyTorch 版本检查 ---
-      - name: Install Project Dependencies (Ignoring Torch Check)
+      # --- 标准依赖安装：现在它会安装稳定版本 ---
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # 使用 --no-deps 避免项目依赖中不兼容的 torch 版本报错
-          pip install -e . --no-deps
-          # 如果项目有额外的 requirements.txt，确保它们也被安装
+          pip install -e .
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
         shell: powershell
 
