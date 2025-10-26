@@ -20,11 +20,11 @@ jobs:
       with:
         python-version: '3.11'
 
-    # --- 关键修复 1：覆盖 requirements.txt，添加 modelscope 依赖 ---
+    # --- 关键修复 1：覆盖 requirements.txt，确保所有缺失的深层依赖都已包含 ---
     - name: "Fix and Overwrite requirements.txt"
       shell: powershell
       run: |
-        $reqs_content = "torch==2.4.0`n" + `
+        $reqs_content = "torch==2.4.0`n" + `        # 保持 2.4.0 以确保 Actions 可以找到预编译包
                         "torchaudio==2.4.0`n" + `
                         "torchvision==0.19.0`n" + `
                         "torchmetrics==1.7.3`n" + `
@@ -48,7 +48,8 @@ jobs:
                         "pandas==2.3.0`n" + `
                         "tqdm`n" + `
                         "datasets`n" + `
-                        "modelscope"  # <--- 最终修复：添加 modelscope
+                        "modelscope`n" + `      # <--- 修复 ModuleNotFoundError: No module named 'modelscope'
+                        "flash-attn"          # <--- 修复 ModuleNotFoundError: No module named 'block_sparse_attn'
         
         $reqs_content | Out-File -FilePath requirements.txt -Encoding utf8
         Write-Host "Successfully fixed requirements.txt."
