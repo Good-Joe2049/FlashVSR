@@ -1,3 +1,11 @@
+name: Multi-Platform Auto Build & Smart Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
 jobs:
   build:
     name: Build on ${{ matrix.os }}
@@ -10,7 +18,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- 修复点 1: macOS 依赖 ---
+      # --- macOS 修复：安装 Xcode Command Line Tools (解决构建失败) ---
       - name: Install Xcode Command Line Tools on macOS
         if: runner.os == 'macOS'
         run: xcode-select --install || true
@@ -19,8 +27,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
-      # --- 修复点 2: 依赖安装（Bash - Ubuntu/macOS） ---
+
+      # --- 依赖安装：针对 Linux/macOS 使用 Bash 语法 ---
       - name: Install dependencies (Bash)
         if: runner.os != 'Windows'
         run: |
@@ -29,16 +37,16 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         shell: bash
         
-      # --- 修复点 2: 依赖安装（PowerShell - Windows） ---
+      # --- 依赖安装：针对 Windows 使用 PowerShell 语法 (Shell兼容性优化) ---
       - name: Install dependencies (PowerShell)
         if: runner.os == 'Windows'
         run: |
           python -m pip install --upgrade pip
           pip install -e .
+          # PowerShell 语法：使用 Test-Path 检查文件是否存在
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
         shell: powershell
-      
-      # 以下步骤保持不变...
+
       - name: Verify import
         run: python -c "import flashvsr; print('✅ FlashVSR import OK')"
 
@@ -53,3 +61,58 @@ jobs:
         with:
           name: flashvsr_${{ runner.os }}
           path: flashvsr_${{ runner.os }}.zip
+
+  release:
+    name: Create Smart Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate version and build time
+        id: meta
+        run: |
+          # 自动生成版本号
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+          else
+            COUNT=$(git rev-list --count HEAD)
+            TAG_NAME="v0.${COUNT}"
+          fi
+          echo "tag=${TAG_NAME}" >> $GITHUB_OUTPUT
+
+          # 记录当前 UTC 时间
+          BUILD_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          echo "build_time=${BUILD_TIME}" >> $GITHUB_OUTPUT
+
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          echo "⚡ **FlashVSR Auto Build**" > release_notes.txt
+          echo "" >> release_notes.txt
+          echo "📅 **Build Time (UTC):** ${{ steps.meta.outputs.build_time }}" >> release_notes.txt
+          echo "" >> release_notes.txt
+          echo "💻 **Available Platforms:**" >> release_notes.txt
+          echo "- 🐧 Ubuntu: \`flashvsr_Ubuntu.zip\`" >> release_notes.txt
+          echo "- 🪟 Windows: \`flashvsr_Windows.zip\`" >> release_notes.txt
+          echo "- 🍎 macOS: \`flashvsr_macOS.zip\`" >> release_notes.txt
+          echo "" >> release_notes.txt
+          echo "📦 Download the corresponding zip file for your platform." >> release_notes.txt
+          echo "" >> release_notes.txt
+          echo "🔢 **Version:** ${{ steps.meta.outputs.tag }}" >> release_notes.txt
+          echo "" >> release_notes.txt
+          echo "🚀 *Automatically built and published by GitHub Actions.*" >> release_notes.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: FlashVSR ${{ steps.meta.outputs.tag }}
+          body_path: release_notes.txt
+          files: artifacts/*/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
