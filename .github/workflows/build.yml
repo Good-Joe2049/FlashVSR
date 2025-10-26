@@ -20,6 +20,7 @@ jobs:
       with:
         python-version: '3.11'
 
+    # --- 关键修复 1：覆盖 requirements.txt，添加 modelscope 依赖 ---
     - name: "Fix and Overwrite requirements.txt"
       shell: powershell
       run: |
@@ -46,11 +47,13 @@ jobs:
                         "fiftyone==0.24.1`n" + `
                         "pandas==2.3.0`n" + `
                         "tqdm`n" + `
-                        "datasets"
+                        "datasets`n" + `
+                        "modelscope"  # <--- 最终修复：添加 modelscope
         
         $reqs_content | Out-File -FilePath requirements.txt -Encoding utf8
         Write-Host "Successfully fixed requirements.txt."
 
+    # --- 关键修复 2：只安装依赖 ---
     - name: "Install Dependencies"
       shell: powershell
       run: |
@@ -58,7 +61,7 @@ jobs:
         if (Test-Path requirements.txt) { pip install -r requirements.txt }
         Write-Host "Dependencies installed. Project installation bypassed."
 
-    # 关键修正：使用双引号包裹，避免键名中的冒号引起解析错误
+    # --- 调试步骤（已确认包名是 'diffsynth'）---
     - name: "Debug Package Structure (Verified: Package is 'diffsynth')"
       shell: bash
       run: echo "Confirmed package directory is 'diffsynth' based on repository structure."
