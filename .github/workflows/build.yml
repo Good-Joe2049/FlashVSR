@@ -24,7 +24,6 @@ jobs:
     - name: "Fix and Overwrite requirements.txt (Final Simplified List)"
       shell: powershell
       run: |
-        # 移除 modelscope, flash-attn 等复杂依赖
         $reqs_content = "torch==2.4.0`n" + `        
                         "torchaudio==2.4.0`n" + `
                         "torchvision==0.19.0`n" + `
@@ -53,17 +52,13 @@ jobs:
         $reqs_content | Out-File -FilePath requirements.txt -Encoding utf8
         Write-Host "Successfully fixed requirements.txt."
 
-    # --- 只安装依赖 ---
+    # --- 只安装依赖 (绕过有问题的 pip install . ) ---
     - name: "Install Dependencies"
       shell: powershell
       run: |
         python -m pip install --upgrade pip
         if (Test-Path requirements.txt) { pip install -r requirements.txt }
         Write-Host "Dependencies installed. Project installation bypassed."
-
-    - name: "Debug Package Structure (Verified: Package is 'diffsynth')"
-      shell: bash
-      run: echo "Confirmed package directory is 'diffsynth' based on repository structure."
 
     # --- 绕过深度依赖检查，只检查路径存在 ---
     - name: "Verify Import Path Existence (Bypass Deep Dependency Check)"
@@ -76,19 +71,32 @@ jobs:
           exit 1
         fi
         
-    - name: "Package build"
+    # --- 关键修复 4：打包整个项目根目录下的关键文件，生成完整的发布包 ---
+    - name: "Package build (Full Project Structure)"
       shell: powershell
       run: |
-        mkdir release
-        Copy-Item -Path diffsynth -Destination release -Recurse -Force  
-        Copy-Item -Path examples/WanVSR -Destination release/examples -Recurse -Force
-        Compress-Archive -Path release\* -DestinationPath diffsynth_Windows.zip -CompressionLevel Optimal -Force 
+        $temp_dir = "temp_package_root"
+        mkdir $temp_dir
+        
+        # 1. 复制核心项目文件夹
+        Copy-Item -Path diffsynth -Destination $temp_dir -Recurse -Force  
+        # 复制 examples/WanVSR 到 temp_package_root/examples/WanVSR
+        Copy-Item -Path examples/WanVSR -Destination "$temp_dir\examples" -Recurse -Force
+        
+        # 2. 复制根目录下的关键文件 (加入文件存在性检查，确保脚本健壮性)
+        if (Test-Path requirements.txt) { Copy-Item -Path requirements.txt -Destination $temp_dir -Force }
+        if (Test-Path setup.py) { Copy-Item -Path setup.py -Destination $temp_dir -Force }
+        if (Test-Path LICENSE) { Copy-Item -Path LICENSE -Destination $temp_dir -Force }
+        if (Test-Path README.md) { Copy-Item -Path README.md -Destination $temp_dir -Force }
+        
+        # 3. 压缩临时目录下的所有内容，生成最终 ZIP 包
+        Compress-Archive -Path "$temp_dir\*" -DestinationPath diffsynth_Windows_Full.zip -CompressionLevel Optimal -Force
 
     - name: "Upload build artifact"
       uses: actions/upload-artifact@v4
       with:
-        name: diffsynth_Windows
-        path: diffsynth_Windows.zip 
+        name: diffsynth_Windows_Full
+        path: diffsynth_Windows_Full.zip 
 
   release:
     name: Create Smart Release
@@ -96,7 +104,7 @@ jobs:
     needs: build
 
     steps:
-    # --- 修复 Git 仓库错误：在 release job 中 checkout ---
+    # --- 关键修复：在 release job 中添加 checkout，获取 Git 元数据 ---
     - name: "Checkout code for Git Metadata"
       uses: actions/checkout@v4
 
@@ -121,32 +129,25 @@ jobs:
     - name: "Generate Release Notes"
       id: notes
       run: |
-        # --- 关键修复：修正 echo 的重定向和变量输出 ---
-        # 1. 将 Release Notes 文本写入文件
-        echo "⚡ **DiffSynth Auto Build (Windows Only)**" > release_notes.txt
+        echo "⚡ **DiffSynth Auto Build (Windows Only) - Full Project**" > release_notes.txt
         echo "" >> release_notes.txt
         echo "📅 **Build Time (UTC):** ${{ steps.meta.outputs.build_time }}" >> release_notes.txt
         echo "" >> release_notes.txt
         echo "💻 **Available Platform:**" >> release_notes.txt
-        echo "- 🪟 Windows: \`diffsynth_Windows.zip\`" >> release_notes.txt
+        echo "- 🪟 Windows: \`diffsynth_Windows_Full.zip\`" >> release_notes.txt
         echo "" >> release_notes.txt
-        echo "📦 Download the zip file for the Windows platform." >> release_notes.txt
+        echo "📦 Download the zip file which contains the full project structure (including setup.py and requirements.txt)." >> release_notes.txt
         echo "" >> release_notes.txt
-        echo "🔢 **Version:** ${{ steps.meta.outputs.tag }}" >> release_notes.txt # 注意：这里是写入文件
+        echo "🔢 **Version:** ${{ steps.meta.outputs.tag }}" >> release_notes.txt 
         echo "" >> release_notes.txt
         echo "🚀 *Automatically built and published by GitHub Actions.*" >> release_notes.txt
-
-        # 2. 将版本标签变量输出到 Actions 环境 (必须是 name=value 格式)
-        echo "version=${{ steps.meta.outputs.tag }}" >> $GITHUB_OUTPUT
-      # --- -------------------------------------------- ---
 
     - name: "Create GitHub Release"
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.meta.outputs.tag }}
-        # 使用修正后的 notes 步骤输出的 version 变量作为 Release Name 的一部分，并使用 body_path 引用 notes 文件
-        name: DiffSynth ${{ steps.meta.outputs.tag }}
+        name: DiffSynth ${{ steps.meta.outputs.tag }} (Full)
         body_path: release_notes.txt
-        files: artifacts/*/*.zip
+        files: artifacts/diffsynth_Windows_Full/*.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
